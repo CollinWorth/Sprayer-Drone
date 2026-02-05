@@ -1,0 +1,16 @@
+empy==3.3.4
+fastcrc==0.3.5
+future==1.0.0
+gnureadline==8.3.3
+grpcio==1.76.0
+lxml==6.0.2
+MAVProxy==1.8.74
+mavsdk==3.10.2
+numpy==2.4.1
+pexpect==4.9.0
+protobuf==6.33.4
+ptyprocess==0.7.0
+pymavlink==2.4.49
+pynmeagps==1.1.0
+pyserial==3.5
+typing_extensions==4.15.0
