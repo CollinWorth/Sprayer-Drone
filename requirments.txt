@@ -13,4 +13,5 @@ ptyprocess==0.7.0
 pymavlink==2.4.49
 pynmeagps==1.1.0
 pyserial==3.5
+python-dotenv==1.2.1
 typing_extensions==4.15.0
