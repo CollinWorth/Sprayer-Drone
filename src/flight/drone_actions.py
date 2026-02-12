@@ -77,6 +77,15 @@ class Drone:
         print("--- Returning to Launch ---")
         await self.system.action.return_to_launch()
 
+    async def land(self):
+        """Lands the drone."""
+        print("--- Landing ---")
+        await self.system.action.land()
+        async for in_air in self.system.telemetry.in_air():
+            if not in_air:
+                print("--> Drone Landed")
+                break
+
     async def disarm(self):
         """Disarms the drone."""
         print("--- Disarming ---")
