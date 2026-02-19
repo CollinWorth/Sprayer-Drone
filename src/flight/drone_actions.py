@@ -1,8 +1,64 @@
 import asyncio
 import os
+import json
 from dotenv import load_dotenv
 from mavsdk import System
 from mavsdk.mission import MissionItem, MissionPlan
+from mavsdk.mission_raw import MissionItem as MissionRawItem
+from mavsdk.telemetry import MAV_CMD
+
+def convert_mission_raw_item_to_mission_item(raw_item: MissionRawItem) -> MissionItem:
+    """
+    Converts a mavsdk.mission_raw.MissionItem to a mavsdk.mission.MissionItem.
+
+    Args:
+        raw_item: The mission_raw.MissionItem object to convert.
+
+    Returns:
+        A new mavsdk.mission.MissionItem object.
+    """
+
+    # Initialize with default values or values that can be directly mapped
+    mission_item = MissionItem(
+        latitude_deg=raw_item.x / 1e7,  # x is latitude scaled by 1e7
+        longitude_deg=raw_item.y / 1e7, # y is longitude scaled by 1e7
+        relative_altitude_m=raw_item.z, # z is altitude in meters
+        speed_m_s=float('nan'),         # Default to NaN, will be set if command specifies
+        is_fly_through=False,           # Default, will be set if command specifies
+        gimbal_pitch_deg=float('nan'),  # Default to NaN
+        gimbal_yaw_deg=float('nan'),    # Default to NaN
+        camera_action=MissionItem.CameraAction.NONE,
+        loiter_time_s=float('nan'),
+        camera_photo_interval_s=float('nan'),
+        acceptance_radius_m=float('nan'),
+        yaw_deg=float('nan'),
+        camera_photo_distance_m=float('nan'),
+        vehicle_action=MissionItem.VehicleAction.NONE
+    )
+
+    # Interpret MAVLink command and parameters
+    if raw_item.command == MAV_CMD.MAV_CMD_NAV_WAYPOINT:
+        mission_item.is_fly_through = (raw_item.param3 == 0)
+        mission_item.acceptance_radius_m = raw_item.param2
+        mission_item.yaw_deg = raw_item.param4
+
+    elif raw_item.command == MAV_CMD.MAV_CMD_DO_CHANGE_SPEED:
+        mission_item.speed_m_s = raw_item.param2
+
+    elif raw_item.command == MAV_CMD.MAV_CMD_NAV_LOITER_TIME:
+        mission_item.loiter_time_s = raw_item.param1
+        mission_item.acceptance_radius_m = raw_item.param2
+        mission_item.yaw_deg = raw_item.param4
+
+    elif raw_item.command == MAV_CMD.MAV_CMD_IMAGE_START_CAPTURE:
+        mission_item.camera_action = CameraAction.TAKE_PHOTO
+
+    elif raw_item.command == MAV_CMD.MAV_CMD_DO_MOUNT_CONTROL:
+        mission_item.gimbal_pitch_deg = raw_item.param1
+        mission_item.gimbal_yaw_deg = raw_item.param3
+
+    return mission_item
+
 
 class Drone:
     def __init__(self):
@@ -50,10 +106,13 @@ class Drone:
                 print(f"--> Altitude Reached: {round(position.relative_altitude_m, 1)}m")
                 break
 
-    async def upload_mission(self, mission_items):
-        """Uploads a mission to the drone."""
-        print("--- Uploading mission ---")
-        mission_plan = MissionPlan(mission_items)
+    async def upload_mission(self, mission_file_path: str):
+        """Uploads a mission to the drone from a QGroundControl plan file."""
+        print(f"--- Importing QGC Plan from {mission_file_path} ---")
+        mission_raw_result = await self.system.mission_raw.import_qgroundcontrol_mission(mission_file_path)
+        converted_mission_items = [convert_mission_raw_item_to_mission_item(item) for item in mission_raw_result.mission_items]
+        mission_plan = MissionPlan(converted_mission_items)
+        print(f"--- Uploading {len(converted_mission_items)} items ---")
         await self.system.mission.upload_mission(mission_plan)
         print("--> Mission Uploaded")
 
@@ -72,10 +131,20 @@ class Drone:
                 print("-- Mission Complete")
                 break
 
+    async def is_mission_finished(self) -> bool:
+        """Checks if the mission is finished."""
+        return await self.system.mission.is_mission_finished()
+
     async def return_to_launch(self):
         """Commands the drone to return to the launch position."""
         print("--- Returning to Launch ---")
         await self.system.action.return_to_launch()
+
+    async def hold(self):
+        """Sets the drone to hold mode."""
+        print("--- Setting to Hold Mode ---")
+        await self.system.action.hold()
+        print("--> Drone in Hold Mode")
 
     async def land(self):
         """Lands the drone."""
