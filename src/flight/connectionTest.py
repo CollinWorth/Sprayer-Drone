@@ -1,4 +1,5 @@
 import asyncio
+import glob
 from mavsdk import System
 
 async def run():
@@ -9,11 +10,11 @@ async def run():
     ports_to_try = [
         "udp://:14540",
         "udp:127.0.0.1:14540",
-        "serial:///dev/tty.usbmodem101:115200",
-        "serial:///dev/ttyACM0:115200", 
-        "serial:///dev/ttyACM1:115200",
-        "serial:///dev/ttyUSB0:115200"
     ]
+
+    # Dynamically find serial ports
+    for port in glob.glob("/dev/tty.usbmodem*") + glob.glob("/dev/ttyACM*") + glob.glob("/dev/ttyUSB*"):
+        ports_to_try.append(f"serial://{port}:115200")
 
     connected = False
     for port in ports_to_try:

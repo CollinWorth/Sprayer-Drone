@@ -1,81 +1,61 @@
 import asyncio
-import sys
-import select
+import os
+from dotenv import load_dotenv
 from mavsdk import System
 
-# --- CONFIGURATION ---
-MISSION_FILE = "parker_farm_1.plan" # Ensure this file exists
-CONNECTION_STR = "udp://:14540" # Simulator
-
-# --- MOCK VISION SYSTEM (Modified for keyboard input) ---
-# In real life, this would be your YOLO/OpenCV function
-def check_keyboard_input():
-    # Check if there's input waiting
-    if select.select([sys.stdin], [], [], 0)[0]:
-        line = sys.stdin.readline().strip()
-        if line == "":  # Enter key pressed
-            return True
-    return False
+# Load variables from .env
+load_dotenv()
+CONNECTION_STR = os.getenv("CONNECTION_STRING")
+MISSION_FILE = os.getenv("MISSION_FILE")
 
 async def run():
     drone = System()
+    
+    print(f"Connecting to drone at {CONNECTION_STR}...")
     await drone.connect(system_address=CONNECTION_STR)
 
-    print("Waiting for drone...")
+    print("Waiting for drone to connect...")
     async for state in drone.core.connection_state():
         if state.is_connected:
             print("Drone connected!")
             break
 
-    # 1. SETUP: Import and Upload Mission
-    print("Importing QGC Plan...")
+    # 1. SETUP: Import and Upload Mission to Cube EEPROM
+    print(f"Importing {MISSION_FILE}...")
     mission_data = await drone.mission_raw.import_qgroundcontrol_mission(MISSION_FILE)
-    print(f"Uploading {len(mission_data.mission_items)} items...")
+    
+    print(f"Uploading {len(mission_data.mission_items)} items to Cube...")
     await drone.mission_raw.upload_mission(mission_data.mission_items)
     
     # 2. LAUNCH
     print("Arming...")
+    # Note: Cube will reject arming if GPS lock isn't solid or EKF is unhappy
     await drone.action.arm()
     
     print("Starting Mission...")
     await drone.mission.start_mission()
 
     # 3. THE SMART LOOP
-    # We poll the vision system constantly while the mission flies
-    while True:
-        # Check if mission is finished
-        mission_progress = await drone.mission.is_mission_finished()
-        if mission_progress:
-            print("Survey Complete!")
+    # The script now runs headless and monitors status
+    async for mission_progress in drone.mission.mission_progress():
+        print(f"Mission progress: {mission_progress.current}/{mission_progress.total}")
+        
+        # --- FUTURE VISION LOGIC GOES HERE ---
+        # Example: 
+        # if vision_system.target_detected():
+        #     await drone.action.hold()
+        #     await do_spray_action()
+        #     await drone.mission.start_mission()
+        
+        if mission_progress.current == mission_progress.total:
+            print("Final waypoint reached.")
             break
 
-        # --- VISION CHECK ---
-        if check_keyboard_input():
-            print("!!! KEYBOARD INTERRUPT DETECTED - INTERRUPTING MISSION !!!")
-            
-            # A. PAUSE (Switch to Hold Mode)
-            # This freezes the drone in place (GPS Hold)
-            await drone.action.hold()
-            
-            # B. PERFORM ACTION (Spray)
-            print(">>> SPRAYING TARGET...")
-            # Real code: toggle a relay or servo here
-            # await drone.action.set_actuator(1, 0.9) 
-            await asyncio.sleep(2) # Simulate spray duration
-            print(">>> SPRAY COMPLETE.")
-
-            # C. RESUME (Switch back to Mission Mode)
-            # ArduPilot automatically remembers where it was in the mission
-            print("Resuming Mission...")
-            await drone.mission.start_mission()
-
-        # Small sleep to prevent CPU hogging
-        await asyncio.sleep(0.1)
-
-    # End
+    print("Mission Complete! Initiating RTL...")
     await drone.action.return_to_launch()
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run())
-
+    try:
+        asyncio.run(run())
+    except KeyboardInterrupt:
+        print("Script stopped by user.")

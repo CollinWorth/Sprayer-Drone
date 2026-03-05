@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from mavsdk import System
 from mavsdk.mission import MissionItem, MissionPlan
 from mavsdk.mission_raw import MissionItem as MissionRawItem
-from mavsdk.telemetry import MAV_CMD
+#from mavsdk.telemetry import MAV_CMD
 
 def convert_mission_raw_item_to_mission_item(raw_item: MissionRawItem) -> MissionItem:
     """
