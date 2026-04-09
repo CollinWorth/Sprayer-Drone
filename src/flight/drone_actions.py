@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from mavsdk import System
 from mavsdk.mission import MissionItem, MissionPlan
 from mavsdk.mission_raw import MissionItem as MissionRawItem
-from mavsdk.action import ActionError
 #from mavsdk.telemetry import MAV_CMD
 
 def convert_mission_raw_item_to_mission_item(raw_item: MissionRawItem) -> MissionItem:
@@ -80,49 +79,22 @@ class Drone:
                 return True
         return False
 
-    async def wait_for_readiness(self, indoor_mode=False):
-        """
-        Waits for the drone to be ready. 
-        If indoor_mode is True, it ignores the GPS requirement.
-        """
-        print(f"--- Waiting for readiness (Indoor Mode: {indoor_mode}) ---")
-        
+    async def wait_for_readiness(self):
+        """Waits for the drone to be ready (passes health checks)."""
+        print("--- Waiting for drone to be ready ---")
         async for health in self.system.telemetry.health():
-            # Check standard armable status (covers gyros, accel, mag)
-            is_ready = health.is_armable
-            
-            # If NOT in indoor mode, we also strictly require a GPS lock
-            if not indoor_mode:
-                is_ready = is_ready and health.is_global_position_ok
-            
-            if is_ready:
+            if health.is_armable and health.is_global_position_ok:
                 print("--> System Ready")
                 break
-            
-            # Optional: Print why we are still waiting
-            if not health.is_armable:
-                print("    [Waiting] Hardware checks not passing...")
-            elif not indoor_mode and not health.is_global_position_ok:
-                print("    [Waiting] Waiting for GPS lock (Global Position)...")
-                
-            await asyncio.sleep(1)
 
     async def arm(self):
-        """Arms the drone and provides feedback on failures."""
-        print("--- Attempting to Arm ---")
-        try:
-            await self.system.action.arm()
-            print("--> Arm Command Accepted")
-            
-            # Verify it actually armed
-            async for is_armed in self.system.telemetry.armed():
-                if is_armed:
-                    print("--> Drone is ARMED and props should be spinning.")
-                    break
-        except ActionError as e:
-            # This catches MAVSDK-level errors like 'CONNECTION_ERROR' or 'COMMAND_DENIED'
-            print(f"❌ Arming Failed: {e._result.result_str}")
-            print("Check the status messages below for the specific Pre-Arm failure.")
+        """Arms the drone."""
+        print("--- Arming ---")
+        await self.system.action.arm()
+        async for is_armed in self.system.telemetry.armed():
+            if is_armed:
+                print("--> Drone Armed")
+                break
 
     async def takeoff(self, altitude=10.0):
         """Takes off to a specific altitude."""
@@ -195,8 +167,3 @@ class Drone:
         # The 'await self.system.connect()' doesn't have a clean disconnect,
         # the object just gets destroyed.
         pass
-
-    async def log_status_messages(self):
-        """Prints human-readable error messages sent from the Pixhawk."""
-        async for status_text in self.system.telemetry.status_text():
-            print(f"  [PIXHAWK]: {status_text.text}")

@@ -7,12 +7,16 @@ import sys
 # Load default from .env
 load_dotenv()
 CONNECTION_STR = os.getenv("CONNECTION_STRING")
+MISSION_PATH = "/Users/collin/drone/Sprayer-Drone/missions"
+MISSION_FILE_RAW = os.getenv("MISSION_FILE")
 
 # Override MISSION_FILE if an argument is passed: python3 script.py field_2.plan
 if len(sys.argv) > 1:
     MISSION_FILE = sys.argv[1]
 else:
-    MISSION_FILE = os.getenv("MISSION_FILE")
+    MISSION_FILE = os.path.join(MISSION_PATH,MISSION_FILE_RAW)
+
+    # MISSION_FILE = os.path.join("/Users/collin/drone/Sprayer-Drone/src/flight", "parker_farm_1.plan")
 
 
 async def run():
