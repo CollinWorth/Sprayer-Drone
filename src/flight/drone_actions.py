@@ -79,13 +79,19 @@ class Drone:
                 return True
         return False
 
-    async def wait_for_readiness(self):
+    async def wait_for_readiness(self, require_gps=True):
         """Waits for the drone to be ready (passes health checks)."""
         print("--- Waiting for drone to be ready ---")
         async for health in self.system.telemetry.health():
-            if health.is_armable and health.is_global_position_ok:
+            ready = health.is_armable and (health.is_global_position_ok if require_gps else True)
+            if ready:
                 print("--> System Ready")
                 break
+
+    async def log_status_messages(self):
+        """Logs status messages from the drone."""
+        async for msg in self.system.telemetry.status_text():
+            print(f"[Status] [{msg.type}] {msg.text}")
 
     async def arm(self):
         """Arms the drone."""

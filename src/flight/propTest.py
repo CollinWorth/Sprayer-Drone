@@ -9,8 +9,8 @@ async def run():
     # messages the moment they happen
     asyncio.create_task(drone.log_status_messages())
 
-    # This might hang if you're indoors without a GPS lock
-    await drone.wait_for_readiness() 
+    # Skip GPS check for ground prop tests
+    await drone.wait_for_readiness(require_gps=False)
     
     await drone.arm()
     
