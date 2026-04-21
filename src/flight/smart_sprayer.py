@@ -34,16 +34,16 @@ async def monitor_flight_mode(drone, mode_event):
 async def wait_for_readiness(drone, timeout_s=120):
     """Wait for GPS lock and EKF before arming. Exits after timeout_s seconds."""
     print("Waiting for GPS and EKF readiness...")
+    async def _check():
+        async for health in drone.telemetry.health():
+            if health.is_armable and health.is_global_position_ok:
+                print("System ready.")
+                return True
     try:
-        async with asyncio.timeout(timeout_s):
-            async for health in drone.telemetry.health():
-                if health.is_armable and health.is_global_position_ok:
-                    print("System ready.")
-                    return True
-    except TimeoutError:
+        return await asyncio.wait_for(_check(), timeout=timeout_s)
+    except asyncio.TimeoutError:
         print(f"ERROR: Drone not ready after {timeout_s}s. Check GPS and EKF status.")
         return False
-    return False
 
 
 async def arm_and_confirm(drone):
@@ -88,7 +88,13 @@ async def run():
 
     print(f"Uploading {len(mission_data.mission_items)} items...")
     try:
-        await drone.mission_raw.upload_mission(mission_data.mission_items)
+        await asyncio.wait_for(
+            drone.mission_raw.upload_mission(mission_data.mission_items),
+            timeout=60.0
+        )
+    except asyncio.TimeoutError:
+        print("ERROR: Failed to upload mission — timed out after 60s")
+        return
     except Exception as e:
         print(f"ERROR: Failed to upload mission — {e}")
         return
@@ -100,6 +106,7 @@ async def run():
 
     print("Starting Mission...")
     try:
+        await drone.mission_raw.set_current_mission_item(0)
         await drone.mission.start_mission()
     except Exception as e:
         print(f"ERROR: Failed to start mission — {e}")
@@ -125,7 +132,7 @@ async def run():
         #     await do_spray_action()
         #     await drone.mission.start_mission()
 
-        if mission_progress.total > 0 and mission_progress.current == mission_progress.total:
+        if mission_progress.total > 0 and mission_progress.current >= mission_progress.total - 1:
             print("Final waypoint reached.")
             break
 
