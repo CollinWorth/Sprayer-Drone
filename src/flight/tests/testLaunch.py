@@ -1,5 +1,8 @@
 import asyncio
 import argparse
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from drone_actions import Drone
 
 async def run(takeoff_altitude: float, hover_duration: float):

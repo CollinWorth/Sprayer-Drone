@@ -1,3 +1,11 @@
+"""
+Drone abstraction layer wrapping MAVSDK.
+
+Provides the Drone class used by test scripts for common operations
+(connect, arm, takeoff, upload mission, monitor progress, RTL, land).
+smart_sprayer.py uses MAVSDK's System directly instead to access mission_raw.
+"""
+
 import asyncio
 import os
 import json

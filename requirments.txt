@@ -1,1 +1,5 @@
-numpy==2.2.6
+mavsdk
+python-dotenv
+pymavlink
+pyserial
+pyautogui

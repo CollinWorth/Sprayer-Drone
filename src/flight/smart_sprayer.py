@@ -1,3 +1,16 @@
+"""
+Main mission execution script.
+
+Imports a QGroundControl .plan file, uploads it to the flight controller,
+arms, launches, and monitors progress. Detects RC takeover via flight mode
+telemetry. Includes a hook for computer vision integration to pause the
+mission and trigger the spray actuator at detected stress zones.
+
+Usage:
+    python3 smart_sprayer.py                  # uses MISSION_FILE from .env
+    python3 smart_sprayer.py my_field.plan    # override mission file
+"""
+
 import asyncio
 import os
 from dotenv import load_dotenv

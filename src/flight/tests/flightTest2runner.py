@@ -1,4 +1,7 @@
 import asyncio
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from drone_actions import Drone
 from mavsdk.mission import MissionItem
 
